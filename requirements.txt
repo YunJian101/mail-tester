@@ -1,0 +1,6 @@
+flask
+flask-cors
+flask-socketio
+eventlet
+gunicorn
+cryptography>=38.0.0

@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<!-- 
+SMTP测试工具前端页面
+功能：
+1. 提供SMTP服务器测试界面
+2. 支持自动/手动测试模式
+3. 实时显示测试日志
+4. 动态加载配置
+-->
+<html lang="zh-CN">
+<head>
+    <!-- 基础元数据 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SMTP全面测试工具</title>
+    
+    <!-- SEO优化标签 -->
+    <meta name="description" content="在线SMTP邮件服务器测试工具，快速验证邮箱服务配置">
+    <meta name="keywords" content="邮件测试,SMTP工具,邮箱验证,邮件服务器检测,SMTP测试">
+    <meta name="robots" content="index,follow">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="SMTP邮件服务测试工具">
+    <meta property="og:description" content="专业检测SMTP服务器状态和邮件发送功能">
+    
+    <!-- CDN资源预连接 -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+            margin-top: 20px;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0,0,0,0.1);
+        }
+        .form-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            border: none;
+            padding: 12px 24px;
+            font-weight: 600;
+        }
+        .test-output {
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Monaco', monospace;
+            padding: 20px;
+            border-radius: 8px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+        .output-line {
+            margin: 5px 0;
+        }
+        .success { color: #4ec9b0; }
+        .error { color: #f44747; }
+        .warning { color: #ffcc66; }
+        .info { color: #9cdcfe; }
+        #loadingSpinner {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4" id="page-title">SMTP全面测试工具</h1>
+        <p class="text-center text-muted mb-4" id="page-subtitle">实时测试工具 - 动态显示测试过程</p>
+        
+        <!-- 测试模式选择 -->
+        <div class="mb-4 p-3 bg-light rounded">
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="testMode" id="modeAuto" value="auto" checked onclick="toggleTestMode()">
+                <label class="form-check-label" for="modeAuto">🔍 自动测试模式</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="testMode" id="modeManual" value="manual" onclick="toggleTestMode()">
+                <label class="form-check-label" for="modeManual">⚙️ 手动测试模式</label>
+            </div>
+        </div>
+
+        <!-- SMTP服务器配置 -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="smtpServer" class="form-label">🖥️ SMTP服务器</label>
+                <input type="text" class="form-control" id="smtpServer" placeholder="smtp.example.com">
+            </div>
+            <div class="col-md-6">
+                <label for="username" class="form-label">👤 用户名</label>
+                <input type="text" class="form-control" id="username" placeholder="user@example.com">
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="password" class="form-label">🔑 密码</label>
+                <input type="password" class="form-control" id="password">
+            </div>
+            <div class="col-md-6">
+                <label for="sender" class="form-label">📤 发件人</label>
+                <input type="email" class="form-control" id="sender" placeholder="your@email.com">
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <label for="recipient" class="form-label">📥 收件人</label>
+                <input type="email" class="form-control" id="recipient" placeholder="recipient@example.com">
+            </div>
+        </div>
+
+        <!-- 自动测试配置 -->
+        <div id="autoConfig">
+            <div class="alert alert-info">
+                <strong>自动模式说明:</strong> 将自动测试所有常见端口(25,465,587,2525)和协议组合(明文,STARTTLS,SSL)
+            </div>
+        </div>
+
+        <!-- 手动测试配置 -->
+        <div id="manualConfig" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <label for="smtpPort" class="form-label">🔌 SMTP端口</label>
+                    <input type="number" class="form-control" id="smtpPort" value="587">
+                </div>
+                <div class="col-md-4">
+                    <label for="connectionMethod" class="form-label">🔐 连接方式</label>
+                    <select class="form-select" id="connectionMethod">
+                        <option value="plain">明文连接</option>
+                        <option value="starttls" selected>STARTTLS</option>
+                        <option value="ssl">SSL加密</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="mb-4">
+                <label for="emailSubject" class="form-label">📝 邮件标题</label>
+                <input type="text" class="form-control" id="emailSubject" value="SMTP测试邮件">
+            </div>
+            
+            <div class="mb-4">
+                <label for="emailBody" class="form-label">📄 邮件内容</label>
+                <textarea class="form-control" id="emailBody" rows="4">这是一封测试邮件，用于验证SMTP服务器连接</textarea>
+            </div>
+        </div>
+
+        <div class="d-grid gap-2 d-md-flex justify-content-md-center mb-4">
+            <button id="testButton" class="btn btn-primary btn-lg me-md-2" onclick="runTest()">🚀 开始测试</button>
+            <div id="loadingSpinner" class="spinner-border text-primary align-self-center" style="display: none;"></div>
+        </div>
+
+        <div class="test-output" id="output">
+            <div class="output-line info">等待测试开始...</div>
+        </div>
+    </div>
+
+    <!-- 加载必要的JS库 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    
+    <script>
+        // 初始化WebSocket连接
+        const socket = io();  // 连接到同一端口
+        
+        // 监听日志事件
+        socket.on('log', (data) => {
+            log(data.message, data.type);
+        });
+
+        // 切换测试模式
+        function toggleTestMode() {
+            const isAutoMode = document.getElementById('modeAuto').checked;
+            document.getElementById('autoConfig').style.display = isAutoMode ? 'block' : 'none';
+            document.getElementById('manualConfig').style.display = isAutoMode ? 'none' : 'block';
+        }
+
+        // 初始化页面时设置正确模式
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleTestMode();
+        });
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const line = document.createElement('div');
+            line.className = `output-line ${type}`;
+            line.textContent = message;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        async function encryptPassword(publicKeyPem, password) {
+            try {
+                // 检查浏览器兼容性
+                if (!window.crypto || !window.crypto.subtle) {
+                    throw new Error('浏览器不支持Web Cryptography API');
+                }
+                
+                // 转换PEM格式为ArrayBuffer
+                const pemHeader = '-----BEGIN PUBLIC KEY-----';
+                const pemFooter = '-----END PUBLIC KEY-----';
+                const pemContents = publicKeyPem
+                    .replace(pemHeader, '')
+                    .replace(pemFooter, '')
+                    .replace(/\s+/g, '');
+                const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+                
+                // 导入公钥
+                const publicKey = await crypto.subtle.importKey(
+                    'spki',
+                    binaryDer,
+                    { name: 'RSA-OAEP', hash: 'SHA-256' },
+                    true,
+                    ['encrypt']
+                );
+                
+                // 加密数据
+                const encrypted = await crypto.subtle.encrypt(
+                    { name: 'RSA-OAEP' },
+                    publicKey,
+                    new TextEncoder().encode(password)
+                );
+                
+                // 返回Base64编码结果
+                return btoa(String.fromCharCode(...new Uint8Array(encrypted)));
+            } catch (e) {
+                console.error('加密过程详细错误:', {
+                    error: e,
+                    publicKeyLength: publicKeyPem?.length,
+                    passwordLength: password?.length
+                });
+                throw e;
+            }
+        }
+
+        async function sendMail(smtpConfig) {
+            try {
+                // 获取公钥并加密密码
+                const configRes = await fetch('/api/config');
+                const { public_key } = await configRes.json();
+                // 加密所有敏感字段
+                const encryptField = async (value) => {
+                    if (!value || !public_key || !crypto.subtle) return value;
+                    try {
+                        const encrypted = await encryptPassword(public_key, value);
+                        return 'ENCRYPTED:' + encrypted;
+                    } catch (e) {
+                        console.error(`字段加密失败: ${value}`, e);
+                        return value; // 非关键字段允许回退
+                    }
+                };
+
+                // 密码强制加密，其他字段可选
+                const passwordToSend = await encryptField(smtpConfig.Password);
+                const usernameToSend = await encryptField(smtpConfig.Username);
+                const senderToSend = await encryptField(smtpConfig.From);
+                const recipientToSend = await encryptField(smtpConfig.To);
+                const subjectToSend = await encryptField(smtpConfig.Subject);
+                const bodyToSend = await encryptField(smtpConfig.Body);
+                
+                const response = await fetch('/api/sendmail', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        host: smtpConfig.Host,
+                        port: smtpConfig.Port,
+                        username: smtpConfig.Username,
+                        password: passwordToSend,  // 使用加密后的密码或明文
+                        sender: smtpConfig.From,
+                        recipient: smtpConfig.To,
+                        subject: smtpConfig.Subject,
+                        body: smtpConfig.Body,
+                        method: smtpConfig.TSL.useSSL ? 'ssl' : (smtpConfig.TSL.useStartTLS ? 'starttls' : 'plain')
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || '请求失败');
+                }
+                const result = await response.json();
+                return result.message;
+            } catch (error) {
+                throw new Error(error.message || '网络请求失败');
+            }
+        }
+
+        async function runTest() {
+            const button = document.getElementById('testButton');
+            const spinner = document.getElementById('loadingSpinner');
+            const output = document.getElementById('output');
+            
+            // 重置状态
+            output.innerHTML = '';
+            button.disabled = true;
+            spinner.style.display = 'block';
+            
+            const isAutoMode = document.getElementById('modeAuto').checked;
+            const smtpServer = document.getElementById('smtpServer').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const sender = document.getElementById('sender').value || username;
+            const recipient = document.getElementById('recipient').value || username;
+            
+            if (!smtpServer || !username || !password) {
+                log('❌ 请填写完整的SMTP服务器、用户名和密码', 'error');
+                button.disabled = false;
+                spinner.style.display = 'none';
+                return;
+            }
+
+            if (isAutoMode) {
+                // 自动模式 - 测试多个端口和协议
+                log(`🚀 开始自动测试 ${smtpServer}`, 'info');
+                
+                const ports = [25, 465, 587, 2525];
+                const methods = ['plain', 'starttls', 'ssl'];
+                
+                let successCount = 0;
+                
+                const runSingleTest = (port, method) => {
+                    return new Promise((resolve) => {
+                        log(`\n📡 测试组合: 端口 ${port} - ${method.toUpperCase()}`, 'info');
+                        
+                        const smtpConfig = {
+                            Host: smtpServer,
+                            Port: port,
+                            Username: username,
+                            Password: password,
+                            From: sender,
+                            To: recipient,
+                            Subject: `SMTP测试 - 端口${port} ${method}`,
+                            Body: `测试端口 ${port} 协议 ${method}`,
+                            SecureToken: "",
+                            TSL: {
+                                useStartTLS: method === 'starttls',
+                                useSSL: method === 'ssl'
+                            }
+                        };
+                        
+                        sendMail(smtpConfig)
+                            .then(
+                                () => {
+                                    log(`✅ 端口 ${port} + ${method}: 测试成功`, 'success');
+                                    successCount++;
+                                    resolve(true);
+                                },
+                                error => {
+                                    log(`❌ 端口 ${port} + ${method}: 测试失败`, 'error');
+                                    log(`错误详情: ${error}`, 'error');
+                                    resolve(false);
+                                }
+                            );
+                    });
+                };
+                
+                // 测试所有端口和协议组合
+                const tests = [];
+                for (const port of ports) {
+                    for (const method of methods) {
+                        tests.push(runSingleTest(port, method));
+                    }
+                }
+                Promise.all(tests)
+                    .then(() => {
+                        log(`\n📊 测试完成: ${successCount}/${ports.length * methods.length} 成功`, 'info');
+                        button.disabled = false;
+                        spinner.style.display = 'none';
+                    });
+                
+            } else {
+                // 手动模式 - 测试指定配置
+                const port = document.getElementById('smtpPort').value;
+                const method = document.getElementById('connectionMethod').value;
+                const subject = document.getElementById('emailSubject').value;
+                const body = document.getElementById('emailBody').value;
+                
+                log(`🚀 开始手动测试 ${smtpServer}:${port} (${method})`, 'info');
+                
+                const smtpConfig = {
+                    Host: smtpServer,
+                    Port: port,
+                    Username: username,
+                    Password: password,
+                    From: sender,
+                    To: recipient,
+                    Subject: subject,
+                    Body: body,
+                    SecureToken: "",
+                    TSL: {
+                        useStartTLS: method === 'starttls',
+                        useSSL: method === 'ssl'
+                    }
+                };
+
+                // 执行测试
+                sendMail(smtpConfig)
+                    .then(
+                        () => log('✅ 测试成功: 邮件已发送', 'success'),
+                        error => {
+                            log('❌ 测试失败', 'error');
+                            log(`错误详情: ${error}`, 'error');
+                        }
+                    )
+                    .finally(() => {
+                        button.disabled = false;
+                        spinner.style.display = 'none';
+                        log('测试完成', 'info');
+                    });
+            }
+        }
+    </script>
+
+    <!-- 动态版权声明 -->
+    <div class="text-center mt-4">
+        <h5 class="copyright-text">
+            <span>©</span> 
+            <span id="copyright-year">2026</span>
+            <span id="copyright-text">SMTP测试工具</span>
+        </h5>
+    </div>
+
+    <script>
+    // 从后端API获取配置
+    async function loadConfig() {
+        try {
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                const config = await response.json();
+                
+                // 设置页面标题
+                document.getElementById('page-title').textContent = config.page.title;
+                document.getElementById('page-subtitle').textContent = config.page.subtitle;
+                
+                // 设置favicon
+                if (config.favicon_url) {
+                    const link = document.createElement('link');
+                    link.rel = 'icon';
+                    link.href = config.favicon_url;
+                    document.head.appendChild(link);
+                }
+                
+                // 设置版权信息
+                const copyright = config.copyright;
+                const yearEl = document.getElementById('copyright-year');
+                const textEl = document.getElementById('copyright-text');
+                yearEl.textContent = copyright.year;
+                
+                if (copyright.link) {
+                    const link = document.createElement('a');
+                    link.href = copyright.link;
+                    link.className = 'gradient-text text-decoration-none';
+                    link.textContent = copyright.text;
+                    link.target = '_blank';  // 新窗口打开
+                    link.rel = 'noopener noreferrer';  // 安全属性
+                    textEl.replaceWith(link);
+                } else {
+                    textEl.textContent = copyright.text;
+                    textEl.className = 'gradient-text';
+                }
+            }
+        } catch (error) {
+            console.log('加载配置失败，使用默认值');
+        }
+    }
+    
+    document.addEventListener('DOMContentLoaded', loadConfig);
+    </script>
+
+    <style>
+    .copyright-text {
+        margin: 20px 0;
+        font-size: 14px;
+        color: #6c757d;
+    }
+    .gradient-text {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-weight: bold;
+        margin-left: 5px;
+    }
+    </style>
+</body>
+</html>

@@ -1,0 +1,25 @@
+# SMTP测试工具服务配置
+services:
+  mail-tester:
+    # 使用当前目录的Dockerfile构建
+    image: alioth1/mail-tester:latest
+    container_name: mail-tester
+    # 端口映射
+    ports:
+      - "5000:5000"  # 单一服务端口（HTTP + WebSocket）
+    environment:
+      # Flask运行环境配置
+      
+      # 版权信息配置
+      COPYRIGHT_YEAR: "2026"  # 显示在页脚的版权年份
+      COPYRIGHT_TEXT: "云笺 Ownership"  # 版权声明中的工具名称
+      COPYRIGHT_LINK: "https://shifeiyu.cn"  # 版权文本点击跳转链接(留空则不跳转)
+      
+      # 页面标题配置
+      PAGE_TITLE: "邮箱在线测试工具"  # 主标题文本
+      PAGE_SUBTITLE: "实时测试工具 - 动态显示测试过程"  # 副标题文本
+      
+      # 图标配置
+      FAVICON_URL: "https://shifeiyu.cn/upload/%E7%AB%99%E7%82%B9logo.png"  # 网站图标URL，示例: "https://example.com/favicon.ico" (留空则使用默认无图标)
+    restart: unless-stopped
+    network_mode: "bridge"
